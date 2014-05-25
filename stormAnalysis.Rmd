@@ -1,0 +1,274 @@
+Impact of Storm and Weather events on public health and economy
+===============================================================
+
+
+## Synopsis
+ In this report we try to show which storm and weather have a greater impact 
+ on the public health and economic consequences for communties and muncipalities.
+ Inorder to investigate this hypothesis we have gathered the data from
+ U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database.
+ The events in the database start in the year 1950 and end in November 2011. 
+ This database tracks characteristics of major storms and weather events in 
+ the United States, including when and where they occur, as well as estimates 
+ of any fatalities, injuries, and property damage. From this data taking the
+ top 20 events, we found Tornado's are major danger to public health as it results
+ in more fatalities and Injuries. Flood's on the other hand have major impact on
+ economic consequences.
+ 
+## Data Processing
+ 
+ set global cache options for R 
+ 
+```{r setoptions}
+#set global options
+opts_chunk$set(echo = TRUE, cache = TRUE,message=FALSE)
+```
+ 
+ define a name for the bzip file and download the file
+ 
+```{r downloadfile} 
+bzFilename <- "stomdata.bz2"
+  
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+ 
+download.file(fileUrl,destfile=bzFilename, method="curl")
+ 
+```
+ 
+load the data into a data variable by reading the download file using read.csv 
+with a field seperator "," and quote character "\"", but we need to bzfile
+before passing it to read.csv function
+
+```{r loaddata}
+ #read data
+ data <- read.csv(bzfile(bzFilename),sep=",",quote="\"")
+
+ # print the column names
+ colnames(data)
+ 
+ #print the first few rows
+ head(data,2)
+
+```
+
+### Transformations
+
+Filter and include only the values for the columns
+FATALITIES , INJURIES,  PROPDMG and  CROPDMG when the values are greater than
+zero
+
+```{r interestingvalues}
+m <- subset(data, FATALITIES >0 | INJURIES >0 | PROPDMG > 0 | CROPDMG > 0)  
+```
+
+Convert all the values in EVTYPE column to upper case to clean the data
+```{r uppercase}
+m[,c("EVTYPE")] <- toupper(m[,c("EVTYPE")])
+```
+
+Clean most of the values by correcting and converting them to the
+event types as described in 
+https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf.
+so most of the identical event types are grouped together
+
+```{r cleamevtype column}
+
+        m[m$EVTYPE=="AVALANCE",c("EVTYPE")] <- "AVALANCHE"
+        
+        m[grep("BLIZZARD*",m$EVTYPE),c("EVTYPE")] <- "BLIZZARD"
+        
+        m[grep("HAIL*",m$EVTYPE),c("EVTYPE")] <- "HAIL"
+        
+        m[grep("HEAVY RAIN*",m$EVTYPE),c("EVTYPE")] <- "HEAVY RAIN"
+        
+        m[grep("WATERSPOUT*",m$EVTYPE),c("EVTYPE")] <-"WATERSPOUT"
+        
+        m[grep("HURRICANE*",m$EVTYPE),c("EVTYPE")] <-"HURRICANE"
+        
+        m[grep("THUNDERSTORM*|TUNDERSTORM WIND*|TSTM WIND*|THUDERSTORM WINDS*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+                
+        m[grep("THUNDEERSTORM WINDS*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+        
+        m[grep("THUNDERESTORM WINDS*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+        
+        m[grep("THUNDERTORM WINDS*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+        
+        m[grep("THUNERSTORM WINDS*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+        
+        m[grep("THUNDERSTROM WIND*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+        
+        m[grep("THUNDERSTROM WIND*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+        
+        m[grep("TSTMW*",m$EVTYPE),c("EVTYPE")] <-"THUNDERSTORM WIND"
+        
+        m[grep("TORNADO*",m$EVTYPE),c("EVTYPE")] <-"TORNADO"
+        
+        m[grep("TORNDAO*",m$EVTYPE),c("EVTYPE")] <-"TORNADO"
+        
+        m[grep("RIP CURRENT*",m$EVTYPE),c("EVTYPE")] <-"RIP CURRENT"
+        
+        m[grep("STRONG WIND*",m$EVTYPE),c("EVTYPE")] <-"STRONG WIND"
+        
+        m[grep("LIGHTNING*",m$EVTYPE),c("EVTYPE")] <-"LIGHTNING"
+        
+        m[grep("LIGHTING*|LIGNTNING*",m$EVTYPE),c("EVTYPE")] <-"LIGHTNING"       
+        
+        m[grep("FLASH FLOOD*",m$EVTYPE),c("EVTYPE")] <-"FLASH FLOOD" 
+        
+        m[grep("WINTER WEATHER*",m$EVTYPE),c("EVTYPE")] <-"WINTER WEATHER"
+        
+        m[grep("WINTER STORM*",m$EVTYPE),c("EVTYPE")] <-"WINTER STORM"
+        
+        m[grep("TROPICAL STORM*",m$EVTYPE),c("EVTYPE")] <-"TROPICAL STORM"
+        
+        m[grep("HEAVY SNOW*",m$EVTYPE),c("EVTYPE")] <-"HEAVY SNOW"
+        
+        m[grep("HEAVY RAIN*|HVY RAIN*",m$EVTYPE),c("EVTYPE")] <-"HEAVY RAIN"
+        
+        m[grep("FLOOD/FLASH*|FLOOD FLASH*",m$EVTYPE),c("EVTYPE")] <-"FLASH FLOOD"
+        
+        m[grep("FLOODING|FLOOD/RIVER FLOOD|FLOODS|FLOOD/RAIN/WINDS",m$EVTYPE),c("EVTYPE")] <-"FLOOD"
+        
+        m[grep("WILDFIRES*|WILD FIRES*|WILDFIRE*|WILD/FOREST*",m$EVTYPE),c("EVTYPE")] <-"WILDFIRE"
+        
+        m[grep("HURRICANE*|TYPHOON*",m$EVTYPE),c("EVTYPE")] <-"HURRICANE (TYPHOON)"
+```
+
+Creating a marginal data frame for expense conversion to billions taking
+billion as base line 0 becomes 1e-9 in terms of billions, 1 becomes 1e-8 in
+terms of billions and so on and similarly for k the value is 1e-6 in terms of 
+billions, for h the value is 1e-7 in terms of billions and 
+for m the value is 1e-3 in terms of billions
+
+```{r marginalvalues}
+mag <- c(0,1,2,3,4,5,6,7,8,9,"k","K","m","M","b","B","h","H")
+       
+magv <- c(1e-9,1e-8,1e-7,1e-6,1e-5,1e-4,1e-3,1e-2,1e-1,1,1e-6,1e-6,1e-3,1e-3,1,1,1e-7,1e-7)
+       
+magdf <- data.frame(mag=mag,magv=magv)
+```
+
+Converting the factor values in CROPDMGEXP and PROPDMGEXP to values using
+the marginal dataframe and adding the columns CROPDMGEXPV and PROPDMGEXP
+
+```{r expvalues}
+cb <- subset(m, m$PROPDMGEXP %in% magdf$mag | m$CROPDMGEXP %in% magdf$mag)
+      
+cb$CROPDMGEXPV <- sapply(cb$CROPDMGEXP, function(x){if(x %in% magdf$mag)magdf[mag==x,2] else 0})
+
+cb$PROPDMGEXPV <- sapply(cb$PROPDMGEXP, function(x){if(x %in% magdf$mag)magdf[mag==x,2] else 0})
+```
+
+Adding the values (CROPDMG * CROPDMGEXPV) and (PROPDMG * PROPDMGEXPV)
+to create TOTLEXP column
+
+```{r totalexp}
+cb <- transform(cb, TOTLEXP = CROPDMG * CROPDMGEXPV + PROPDMG * PROPDMGEXPV)
+```
+
+## Results
+
+### Most harmful events to population health
+
+The most harmful events to population health can be assessed by taking the
+top twenty event types for fatalities and injuries
+
+#### Using Fatalities to see the most damaging events for population health
+
+We calculate the total fatalities for each event type
+```{r totfatalities}
+tf <- tapply(cb$FATALITIES,cb$EVTYPE,sum)
+
+#creating a data frame which we can use 
+tfdf <- data.frame(eventtype=names(tf), fat=as.numeric(tf))
+
+#order by fatalities descending
+tfdf <- tfdf[order(tfdf$fat,decreasing=TRUE),]
+
+#take top 20
+tfdf <- tfdf[1:20,]
+
+print(tfdf)
+```
+
+We create a barplot showing the top 20 fatalities
+
+```{r barplotfatalities}
+par(mar=c(13,7,2,2),las=3)
+
+barplot(tfdf$fat, names.arg=tfdf$eventtype, col=tfdf$eventtype,       
+        ylab="Total Fatalities",
+        main="Top 20 Total Fatalities per Event Type")
+
+title(xlab = "Event Type", line=11)
+```
+
+#### Using Injuries to see the most damaging events for population health
+
+We calculate the total injuries for each event type
+```{r totinjuries}
+inj <- tapply(cb$INJURIES,cb$EVTYPE,sum)
+
+#creating a data frame which we can use 
+injdf <- data.frame(eventtype=names(inj), inju=as.numeric(inj))
+
+#order by fatalities descending
+injdf <- injdf[order(injdf$inju,decreasing=TRUE),]
+
+#take top 20
+injdf <- injdf[1:20,]
+
+print(injdf)
+```
+
+We create a barplot showing the top 20 fatalities
+
+```{r barplotinjuries}
+par(mar=c(13,7,2,2),las=3)
+
+barplot(injdf$inju, names.arg=injdf$eventtype, col=injdf$eventtype,       
+        ylab="Total Injuries",
+        main="Top 20 Total Injuries per Event Type")
+
+title(xlab = "Event Type", line=11)
+```
+
+From this fatalities graph and injuries graph it shows **TORNADO's** 
+have a great impact on the population health
+
+### Assessing which event has greatest economic consequence
+
+First we group the total exp (CROPEXP * CROPDMG+ PROPEXP * PROPDMG) by event type 
+and order the rows by exp decreasing and take the top 20 events that contributed 
+to more economic consequences. There is a caveat here I haven't considered the 
+deflation of money across the years
+
+```{r expassess}
+ae <- tapply(cb$TOTLEXP, cb$EVTYPE, sum)
+
+#creating a data frame which we can use 
+aedf <- data.frame(eventtype=names(ae), exp=as.numeric(ae))
+
+# order by expense descending
+aedf <- aedf[order(aedf$exp,decreasing=TRUE),]
+
+#take top 20
+aedf <- aedf[1:20,]
+
+print(aedf)
+```
+
+Now we create a bar graph showing the top events that caused great economic
+sequences
+
+```{r barexp}
+par(mar=c(13,7,2,2),las=3)
+
+barplot(aedf$exp, names.arg=aedf$eventtype, col=aedf$eventtype,       
+        ylab="Total Expense in Billions",
+        main="Top 20 Total Expense in Billion per Event Type")
+
+title(xlab = "Event Typer", line=11)
+```
+
+From the graph its clear that **FLOOD's** have a great economic consequence
